@@ -1,0 +1,473 @@
+\documentclass[10pt,a4paper]{article}
+
+% ============================================================================
+% AirFlow Lab (Phase 1) 理論・数値・教育的整合性検証論文（A4・1段組 高可読性版）
+% ============================================================================
+\usepackage[top=18.5mm,bottom=18.5mm,left=21mm,right=21mm]{geometry}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\setCJKmainfont[BoldFont={Yu Mincho Demibold}]{Yu Mincho}
+\setCJKsansfont{BIZ UDGothic}
+\setCJKmonofont{BIZ UDGothic}
+\XeTeXlinebreaklocale "ja"
+\XeTeXlinebreakskip=0pt plus 1pt minus 0.1pt
+
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage[font=small,labelfont=bf,labelsep=colon]{caption}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{xurl}
+\usepackage[unicode=true,colorlinks=true,linkcolor=navy,citecolor=navy,urlcolor=navy]{hyperref}
+
+% カラー定義
+\definecolor{navy}{RGB}{24,58,108}
+\definecolor{highlightbg}{RGB}{240,246,255}
+\definecolor{highlightborder}{RGB}{100,145,210}
+
+% 行間・段落設定（画面閲覧・印刷双方での可読性重視）
+\linespread{1.34}\selectfont
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.45\baselineskip}
+\emergencystretch=1.8em
+
+% 見出し・ラベルの日本語設定
+\renewcommand{\figurename}{図}
+\renewcommand{\tablename}{表}
+\renewcommand{\refname}{参考文献}
+
+\titleformat{\section}
+  {\Large\sffamily\bfseries\color{navy}}
+  {\thesection.}{0.55em}{}
+  [\vspace{1.5pt}{\color{navy!65}\titlerule[0.6pt]}]
+\titleformat{\subsection}
+  {\large\sffamily\bfseries\color{navy!90!black}}
+  {\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{2.2ex plus 0.4ex minus 0.2ex}{0.9ex plus 0.2ex}
+\titlespacing*{\subsection}{0pt}{1.6ex plus 0.3ex minus 0.1ex}{0.6ex plus 0.15ex}
+
+% 表セル補助マクロ・列定義
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcommand{\mhead}[2]{\begin{tabular}[c]{@{}c@{}}#1\\[0pt]\relax #2\end{tabular}}
+
+\begin{document}
+
+% ============================================================================
+% タイトル・要旨・3行ハイライト
+% ============================================================================
+\begin{center}
+  {\Large\sffamily\bfseries\color{navy} AirFlow Lab（Phase 1）における 2 次元ポテンシャル流れパネル法の\\理論・数値・教育的整合性検証}\par\vspace{2.5mm}
+  {\normalsize\bfseries Verification and Literature Validation of the 2D Potential-Flow Panel Method in AirFlow Lab (Phase 1)}\par\vspace{2.0mm}
+  {\small 対象システム: AirFlow Lab \texttt{v0.1.0}（Phase 1: Hess--Smith パネル法エンジン・Web UI）\quad 作成日: \mbox{2026年11月26日}}
+\end{center}
+\vspace{1.5mm}
+
+\noindent\rule{\textwidth}{0.8pt}
+
+\vspace{1.5mm}
+\noindent\textbf{要旨（Abstract）:}\quad
+本稿では，流体力学初学者および高校生向けの Web ベース 2 次元翼型解析ソフトウェア \textbf{AirFlow Lab（Phase 1）} について，航空宇宙工学・数値流体力学（CFD）・物理教育学の先行研究および一次学術文献を基準とした整合性監査（Code-to-Theory Audit）と定量的な検証・妥当性確認（Verification and Validation: V\&V）を実施した．本ソフトウェアの計算コアは，Hess \& Smith (1967) の定強さ吹出し・共通一定渦パネル法，Jacobs ら (1933) および NASA Turbulence Modeling Resource（TMR）に基づく NACA 4 桁翼型座標生成，Sutherland (1893) の粘性式，ならびに Babinsky (2003) による「同着仮説」誤謬の排除を取り入れた決定論的解説エンジンから構成される．
+
+数値検証の結果，円柱ポテンシャル流れ厳密解に対しては $\max|\Delta C_p| \le 2.58\times 10^{-14}$（$N=40\text{--}320$）の機械精度レベルの一致を示した．NACA 0012 / 2412 / 4412 / 6412（$N=160$）のゼロ揚力迎角 $\alpha_{L=0}$ および $1/4$ 弦点ピッチングモーメント係数 $C_{m,c/4}$ は，Glauert の薄翼理論（Anderson, 2017）とそれぞれ $0.14^\circ$ 以内・$2.3\%$ 以内（$1.6\text{--}2.3\%$）で整合し，かつ Abbott \& von Doenhoff (1959) の風洞実験データに対して粘性境界層排除厚の不在（粘性デキャンバー効果の欠如）に起因する定性的・定量的関係（風洞実測より高めの揚力傾斜・やや大きい $|\alpha_{L=0}|$ および $|C_{m,c/4}|$）が物理法則どおりに再現された．パネル数 $N=40\text{--}300$ においては理論どおりの一次収束 $O(1/N)$ とダランベールのパラドックス（$C_{D,p} \to 0$）が確認され，非粘性モデルの限界（\texttt{cd: null} 強制および失速・圧縮性警告）が設計・実装の両面で貫徹されていることが実証された．
+
+\textbf{キーワード:} パネル法，Hess--Smith 法，NACA 4 桁翼型，物理教育，V\&V，薄翼理論
+
+\vspace{1.0mm}
+\noindent\rule{\textwidth}{0.8pt}
+\vspace{2.5mm}
+
+% 本検証の要点（3行ハイライト）
+\begingroup
+\setlength{\fboxsep}{9pt}
+\setlength{\fboxrule}{0.8pt}
+\noindent\fcolorbox{highlightborder}{highlightbg}{%
+\begin{minipage}{\dimexpr\textwidth-2\fboxsep-2\fboxrule\relax}
+  \small
+  \textbf{\sffamily\color{navy} 本検証の要点（Key Takeaways）}
+  \begin{enumerate}\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}\setlength{\topsep}{3pt}
+    \item \textbf{厳密解・理論との高い数値一致:} 円柱厳密解を丸め誤差水準（$\max|\Delta C_p| \le 2.58\times 10^{-14}$）で再現し，NACA 4 桁翼型の $\alpha_{L=0}$ および $C_{m,c/4}$ が薄翼理論・翼厚効果と矛盾なく一致するとともに $O(1/N)$ の一次収束を確認した．
+    \item \textbf{実測風洞データとの物理的整合性:} Abbott \& von Doenhoff (1959) の実験値に対する揚力傾斜差は，境界層排除厚（粘性デキャンバー効果）を省いた非粘性モデルの理論的帰結として整合的に説明される．
+    \item \textbf{計算限界の誠実な可視化:} ダランベールのパラドックスに基づき抗力係数を \texttt{cd: null}（\texttt{—（算出不可）}）とし，高迎角（$|\alpha|>10^\circ,12^\circ$）・圧縮性警告および「同着仮説」否定解説により初学者向けの物理的誠実さを担保している．
+  \end{enumerate}
+\end{minipage}%
+}
+\endgroup
+\vspace{2.0mm}
+
+% ============================================================================
+% 1. 序論
+% ============================================================================
+\section{序論}
+
+高校生や理工系初学者が翼型周りの流体力学を学ぶ際，「定常な流れが翼周りを通過するとき，なぜ揚力が生まれるのか」「迎角・キャンバー・レイノルズ数を変えると圧力分布や流線はどう変化するのか」を数式と可視化の両面から直感的に結び付ける学習環境が求められる．この分野の先駆的な教育用ツールとして，NASA Glenn Research Center の Tom Benson により開発された \textbf{FoilSim}（Benson, NASA GRC）が挙げられ，スライダー操作と仮想風洞の可視化を通じて探究型学習に高い教育的効果をもたらしてきた．
+
+一方で，初等教育や一般向け解説書においては「翼の上面は下面より距離が長いため，前縁で上下に分かれた流体粒子は後縁で同時に合流しなければならない」とする\textbf{同着仮説（Equal Transit-Time Fallacy）}が長年にわたり流布しており，物理教育学の観点からも明確な誤解として批判されている（Babinsky, 2003）．さらに，汎用解析コードや簡易デモの多くは，数値モデルが非粘性（ポテンシャル流れ）であるにもかかわらず数値誤差由来の見かけの抗力を表示したり，失速迎角域における揚力の過大評価に対して十分な物理的警告を提示しなかったりする課題を抱えている．
+
+\textbf{AirFlow Lab（Phase 1）} は，単一の Hess--Smith 2 次元ポテンシャル流れ計算エンジン（Python / FastAPI / NumPy / SciPy，および静的公開向けのブラウザ内計算エンジン）を「簡易モード（14 機能）」と「本格モード（18 機能）」で共有しつつ，「計算可能な物理量と不可能な物理量を峻別し，モデルの適用限界と物理法則を正直に示す」ことを最優先方針として開発された．本稿の目的は以下の 2 点である．
+\begin{enumerate}\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}
+  \item \textbf{理論・コード整合性監査:} 実装されている翼型座標生成式，影響係数行列，Kutta 条件，物性推算式，安全ガードおよび解説ロジックが先行一次文献の定式化と一致しているかを検証する．
+  \item \textbf{数値検証・文献データ比較（V\&V）:} 厳密解，薄翼理論，ならびに Abbott \& von Doenhoff (1959) 等の風洞実験データとの比較を通じ，Phase 1 の数値精度と物理的適用限界を定量化する．
+\end{enumerate}
+
+% ============================================================================
+% 2. 理論と実装の整合性監査
+% ============================================================================
+\section{理論と実装の整合性監査}
+
+\subsection{翼型幾何形状と後縁定義}
+NACA 4 桁翼型 \texttt{MPXX}（最大キャンバー比 $m=M/100$，最大キャンバー位置 $p=P/10$，最大翼厚比 $t=XX/100$）の幾何定義は Jacobs, Ward \& Pinkerton (1933) の NACA Report No.\ 460 に基づき，\texttt{backend/app/geometry/naca4.py}（およびブラウザ版 \texttt{geometry.ts}）に実装されている．
+\begin{itemize}\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}
+  \item \textbf{平均キャンバー線と法線配置:} $\xi \in [0, 1]$ 上の 2 次区分多項式 $y_c(\xi)$ と法線角 $\theta = \arctan(dy_c/d\xi)$ による上下輪郭 $(x_u, y_u), (x_l, y_l)$ は NACA 原典および Abbott \& von Doenhoff (1959) の標準式と厳密に一致する（\texttt{naca4.py} L64--155）．
+  \item \textbf{閉後縁修正 vs 原典開後縁:} 原典（Jacobs et al., 1933）の 4 次項係数 $a_4 = -0.1015$ は後縁 $\xi=1$ で有限厚さ $y_t(1) = +0.0105 t$（開後縁）を残す．これに対し NASA Langley Turbulence Modeling Resource（TMR）等の標準 CFD・パネル法ベンチマークでは閉後縁（$y_t(1)=0$）を得るため $a_4 = -0.1036$ を用いる．本実装では既定を閉後縁（\texttt{closed\_te=True}, $a_4=-0.1036$）としつつ原典開後縁（$a_4=-0.1015$）も選択可能であり，両文献仕様と完全に整合する．
+\end{itemize}
+
+\subsection{Hess--Smith 2D パネル法ソルバー}
+ポテンシャル流れコアは Hess \& Smith (1967)，Hess (1990) および Katz \& Plotkin (2001) の定式化に準拠し，\texttt{influence.py} および \texttt{hess\_smith.py} に実装されている．
+\begin{itemize}\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}
+  \item \textbf{離散化と分岐切断フリー影響係数:} フルコサイン分布で前縁・後縁節点を密にし，「下面後縁 $\to$ 前縁 $\to$ 上面後縁」の時計回り順で外向き単位法線を統一した．吹出しパネル誘起速度では \texttt{atan2(eta * s\_j, xi * (xi - s\_j) + eta\string^2)} の単一呼び出しと角度差 $\Delta\phi_{ij}$ への三角関数加法定理を用いることで $\pm\pi$ 分岐切断ジャンプを排除している．自己パネル極限は $(A_{n,ii}, A_{t,ii}) = (+0.5, 0.0)$ であり，渦パネル影響係数は Cauchy--Riemann の共役関係 $B_n = -A_t,\ B_t = +A_n$ より導かれ，Katz \& Plotkin (2001) 第 10--11 章と厳密一致する．
+  \item \textbf{非貫通条件と Kutta 条件:} 全 $N$ コロケーション点での法線速度ゼロ条件と後縁上下隣接パネル（第 $0$ 番・第 $N-1$ 番）の線形 Kutta 条件 $V_{t,0} + V_{t,N-1} = 0$ からなる $(N+1)\times(N+1)$ 密行列系をピボット選択付き LU 分解（\texttt{scipy.linalg.solve}）で解く．
+  \item \textbf{空力係数と Gate 2 健全性検査:} 循環 $\hat{\Gamma} = \hat{\gamma}\sum \hat{S}_j$ による Kutta--Joukowski 揚力係数 $C_{L,\mathrm{KJ}} = 2\hat{\Gamma}$ と表面圧力積分 $C_{L,p}$ のクロスチェック，$1/4$ 弦点 $(0.25, 0)$ 周りモーメント係数（頭上げ Nose-up を正）に加え，条件数 $\kappa_2(M)<10^{10}$，線形残差 $<10^{-8}$，質量保存残差，後縁圧力差 $|\Delta C_{p,\mathrm{TE}}|<10^{-5}$，$C_p$ 有界性の 6 段階の健全性ゲート（Gate 2）を実装し，数値破綻時の誤描画を遮断している．
+\end{itemize}
+
+\subsection{流体物性モデルと無次元相似則}
+レイノルズ数 $Re$ およびマッハ数 $M$ の算出に用いる \texttt{fluid\_properties.py} では，乾燥空気（$R = 287.058\,\mathrm{J/(kg\cdot K)}$, $\gamma = 1.4$）に対して理想気体状態方程式 $\rho = p_\infty/(RT)$，音速 $a = \sqrt{\gamma RT}$，および Sutherland (1893) の 3 定数粘性式
+\begin{equation}
+  \mu(T) = \mu_0 \left(\frac{T}{T_0}\right)^{3/2} \frac{T_0 + S}{T + S}
+\end{equation}
+（$\mu_0 = 1.716\times 10^{-5}\,\mathrm{Pa\cdot s},\ T_0 = 273.15\,\mathrm{K},\ S = 110.4\,\mathrm{K}$）を実装している．さらに \texttt{api\_schemas.py} L214--224 において，高密度液体相当（$\rho > 10\,\mathrm{kg/m^3}$）をカスタム指定しつつ音速が未入力の場合は空気音速式の誤適用を防ぐため HTTP 422 で遮断する安全制約を設けている．
+
+\subsection{ダランベールのパラドックスと教育・安全ガード}
+定常な 2 次元非粘性・非圧縮ポテンシャル流れでは，閉物体に働く理論上の抗力は常にゼロ（ダランベールのパラドックス; Anderson, 2017）である．パネル法で圧力積分により残る微小値 $C_{D,p}$ は純粋な離散化数値誤差であるため，本システムは \texttt{hess\_smith.py} L398--404 で \texttt{cd=None} を強制し，UI 上（\texttt{KpiCards.tsx}）も「\texttt{0}」ではなく「\texttt{—（算出不可）}」と明示している．XFOIL（Drela, 1989）および 2D CFD は \texttt{SolverSettingsForm.tsx} で無効化（\texttt{disabled}）され，API 上も HTTP 501 を返す．
+
+また，教育的解説エンジン（\texttt{explanationEngine.ts}）は Babinsky (2003) の指摘に従い，同着仮説を明示的に誤りとして否定し，「(1) クッタの条件と循環 $\to$ (2) 流線の曲率と圧力勾配 $\to$ (3) ベルヌーイの定理 $\to$ (4) 圧力差の合力と反作用」の 4 段階解説を計算実測値と連動させて提示している．以上の監査結果を表~\ref{tab:audit_matrix} にまとめる．
+
+\begin{table}[H]
+  \centering
+  \caption{理論モデル・先行文献と AirFlow Lab（Phase 1）実装コードの整合性チェック総合マトリクス}
+  \label{tab:audit_matrix}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.28}
+  \setlength{\tabcolsep}{4.5pt}
+  \begin{tabularx}{\textwidth}{@{}P{27mm}P{36mm}P{35mm}cY@{}}
+    \toprule
+    \textbf{監査領域} & \textbf{照合した一次文献・標準仕様} & \textbf{該当実装ファイル} & \textbf{整合判定} & \textbf{監査所見} \\
+    \midrule
+    NACA 4桁座標・閉後縁 & Jacobs et al.\ (1933) / NASA TMR & \texttt{geometry/naca4.py} & \textbf{整合} & 原典 $-0.1015$ と閉後縁 $-0.1036$ の双方に対応 \\
+    パネル影響係数行列 & Hess \& Smith (1967) / Katz \& Plotkin (2001) & \texttt{solvers/panel/influence.py} & \textbf{整合} & 単一 \texttt{atan2} により分岐切断ジャンプなし．自己極限 $\pm 0.5$ 厳密 \\
+    Kutta 条件・Gate 2 & Hess (1990) / Katz \& Plotkin (2001) & \texttt{solvers/panel/hess\_smith.py} & \textbf{整合} & $V_{t,0}+V_{t,N-1}=0$ および 6 種の数値破綻遮断ゲート実装 \\
+    流線追跡（RK4 積分） & 常微分方程式 RK4・非貫通境界保護 & \texttt{visualization/streamlines.py} & \textbf{整合} & 停滞点近傍停止・翼内部侵入ガード付きの弧長正規化 RK4 \\
+    流体物性・Sutherland 則 & Sutherland (1893) / ISA 標準大気 & \texttt{services/fluid\_properties.py} & \textbf{整合} & 空気標準定数一致．液体指定時の音速未入力遮断も完備 \\
+    適用限界・警告閾値 & Anderson (2017) / Drela (1989) & \texttt{services/warnings.py} & \textbf{概ね整合} & 局所 Mach 推定に非圧縮線形近似の制約あり（4.1 節） \\
+    教育解説・誤謬排除 & Babinsky (2003) / Benson (FoilSim) & \texttt{utils/explanationEngine.ts} & \textbf{整合} & 同着仮説を明示否定．低迎角粘性差の追記余地あり（4.2 節） \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% ============================================================================
+% 3. 数値検証（Verification）および先行研究との妥当性確認（Validation）
+% ============================================================================
+\section{数値検証および先行研究との比較結果}
+
+本章の数値およびグラフデータはすべて再現スクリプト（\texttt{docs/paper/reproduce\_validation\_tables.py}）の実行により得た一次実測値である．
+
+\subsection{円柱ポテンシャル流れの厳密解検証}
+循環なし（$\gamma=0$）・一様流（$\alpha=0^\circ$）の円柱周り流れの理論解は $C_p(\theta)=1-4\sin^2\theta$ である（Anderson, 2017）．等角時計回りメッシュに対する検証結果を表~\ref{tab:cylinder} に示す．$N=40\text{--}320$ の全条件で倍精度浮動小数点数の丸め誤差水準（$10^{-15}\text{--}10^{-14}$）で厳密解と一致した．定強さ吹出しパネル法であっても円柱上の等角対称配置では離散フーリエ固有対称性（超収束性）により離散化誤差が厳密に相殺されること，および影響係数・圧力積分の実装に符号誤りがないことが裏付けられる．
+
+\begin{table}[H]
+  \centering
+  \caption{円柱ポテンシャル流れ厳密解 $C_p(\theta)=1-4\sin^2\theta$ との比較（$\alpha=0^\circ,\ \gamma=0$）}
+  \label{tab:cylinder}
+  \small
+  \renewcommand{\arraystretch}{1.28}
+  \setlength{\tabcolsep}{7.5pt}
+  \begin{tabular}{@{}rccccc@{}}
+    \toprule
+    パネル数 $N$ & $\max|\Delta C_p|$ & $\mathrm{RMS}(\Delta C_p)$ & $C_{L,p}$ & $C_{D,p}$ & 質量保存残差 \\
+    \midrule
+    40  & \texttt{3.996803e-15} & \texttt{1.310698e-15} & \texttt{-5.117e-17} & \texttt{+2.906e-16} & \texttt{1.180e-16} \\
+    80  & \texttt{6.661338e-15} & \texttt{2.432852e-15} & \texttt{-9.075e-17} & \texttt{-7.516e-16} & \texttt{2.776e-17} \\
+    160 & \texttt{1.421085e-14} & \texttt{4.601645e-15} & \texttt{+0.000e+00} & \texttt{+7.633e-17} & \texttt{8.604e-16} \\
+    320 & \texttt{2.575717e-14} & \texttt{7.994873e-15} & \texttt{-4.441e-16} & \texttt{-8.327e-17} & \texttt{2.220e-16} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{NACA 4 桁標準翼型群の三者比較}
+Glauert の薄翼理論（Anderson, 2017）において，キャンバー線勾配 $dy_c/dx$（$\xi = \frac{1}{2}(1-\cos\theta)$）から得られるゼロ揚力迎角および $1/4$ 弦点モーメント係数は次式で与えられる．
+\begin{equation}
+  \alpha_{L=0,\mathrm{thin}} = -\frac{1}{\pi}\int_0^\pi \frac{dy_c}{dx}(\cos\theta - 1)\,d\theta,\qquad
+  C_{m,c/4,\mathrm{thin}} = -\frac{\pi}{4}(A_1 - A_2)
+\end{equation}
+AirFlow Lab 標準 4 翼型（$N=160$, 閉後縁）におけるパネル法実測値，薄翼理論値，ならびに Abbott \& von Doenhoff (1959) の風洞実験代表値を表~\ref{tab:naca_compare} に，揚力曲線 $C_L(\alpha)$ を図~\ref{fig:cl_alpha} に，NACA 2412（$\alpha=5^\circ$）の表面 $C_p$ 分布を図~\ref{fig:cp_dist} にそれぞれ示す．
+
+\begin{table}[H]
+  \centering
+  \caption{NACA 4 桁標準翼型群における薄翼理論・AirFlow Lab パネル法（$N=160$, 閉後縁）・風洞実験データの比較}
+  \label{tab:naca_compare}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.28}
+  \setlength{\tabcolsep}{4.0pt}
+  \begin{tabular}{@{}lcccccccc@{}}
+    \toprule
+    翼型 & \mhead{$\alpha_{L=0}$}{(薄翼)} & \mhead{$\alpha_{L=0}$}{(パネル法)} & \mhead{$\alpha_{L=0}$}{(実験)} & \mhead{$C_{m,c/4}$}{(薄翼)} & \mhead{$C_{m,c/4}(0^\circ)$}{(パネル法)} & \mhead{$C_{m,c/4}$}{(実験)} & \mhead{$dC_L/d\alpha$}{[$/\mathrm{rad}$]} & \mhead{空力中心}{$x_{ac}/c$} \\
+    \midrule
+    \textbf{NACA 0012} & $-0.000^\circ$ & $+0.000^\circ$ & $0^\circ$ & $-0.00000$ & $+0.00000$ & $0$ & $6.9429$ & $0.2607$ \\
+    \textbf{NACA 2412} & $-2.077^\circ$ & $-2.141^\circ$ & 約 $-2.0^\circ$ & $-0.05312$ & $-0.05433$ & 約 $-0.043\sim -0.050$ & $6.9430$ & $0.2614$ \\
+    \textbf{NACA 4412} & $-4.154^\circ$ & $-4.267^\circ$ & 約 $-3.7^\circ\sim -4.0^\circ$ & $-0.10624$ & $-0.10841$ & 約 $-0.090\sim -0.100$ & $6.9431$ & $0.2626$ \\
+    \textbf{NACA 6412} & $-6.232^\circ$ & $-6.366^\circ$ & 約 $-6.1^\circ\sim -6.2^\circ$ & $-0.15936$ & $-0.16199$ & 約 $-0.13\sim -0.14$ & $6.9434$ & $0.2646$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+表~\ref{tab:naca_compare} より以下の 3 点が整合的に確認された．
+\begin{enumerate}\setlength{\itemsep}{2pt}\setlength{\parskip}{0pt}
+  \item \textbf{薄翼理論との整合:} キャンバー増加に伴い $\alpha_{L=0}$ が負側へ，$C_{m,c/4}$ が頭下げ側へ線形移動し，両理論値の差は $\alpha_{L=0}$ で $0.14^\circ$ 以内，$C_{m,c/4}$ で $1.6\text{--}2.3\%$ である．
+  \item \textbf{空力中心の後方シフト:} 薄翼理論の $x_{ac}/c = 0.25$ に対し $12\%$ 厚翼型では $x_{ac}/c \approx 0.261\text{--}0.265$ となり，ポテンシャル流れの有限厚効果（Katz \& Plotkin, 2001）と整合する．
+  \item \textbf{風洞実験との粘性デキャンバー関係:} Abbott \& von Doenhoff (1959)，Ladson (1988) および Gregory \& O'Reilly (1970) の風洞実験では，境界層排除厚の発達（粘性デキャンバー効果）により線形揚力傾斜が $0.090\text{--}0.105\,\mathrm{deg}^{-1}$（$5.2\text{--}6.0\,\mathrm{rad}^{-1}$）へ低下し，$|\alpha_{L=0}|$ や $|C_{m,c/4}|$ もわずかに減少する．非粘性パネル法が $6.943\,\mathrm{rad}^{-1}$（$0.121\,\mathrm{deg}^{-1}$）を与えることは計算異常ではなく物理モデルの忠実な帰結である．
+\end{enumerate}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.80\textwidth,
+      height=5.8cm,
+      xlabel={迎角 $\alpha$ [deg]},
+      ylabel={揚力係数 $C_L$ [-]},
+      xmin=-4, xmax=16,
+      ymin=-0.7, ymax=2.8,
+      grid=major,
+      grid style={dashed,gray!30},
+      legend pos=north west,
+      legend style={font=\footnotesize, cells={anchor=west}, fill opacity=0.90},
+      tick label style={font=\footnotesize},
+      label style={font=\small},
+    ]
+      \fill[yellow!22] (axis cs:10,-0.7) rectangle (axis cs:12,2.8);
+      \fill[red!13] (axis cs:12,-0.7) rectangle (axis cs:16,2.8);
+      \draw[orange!70!black, dotted, thick] (axis cs:10,-0.7) -- (axis cs:10,2.8);
+      \draw[red!70!black, dashed, thick] (axis cs:12,-0.7) -- (axis cs:12,2.8);
+
+      \addplot[blue!75!black, thick, mark=*, mark size=1.6pt] table[x=alpha, y=cl0012] {data/cl_alpha.dat};
+      \addlegendentry{NACA 0012}
+      \addplot[teal!70!black, thick, mark=square*, mark size=1.6pt] table[x=alpha, y=cl2412] {data/cl_alpha.dat};
+      \addlegendentry{NACA 2412}
+      \addplot[orange!85!black, thick, mark=triangle*, mark size=1.8pt] table[x=alpha, y=cl4412] {data/cl_alpha.dat};
+      \addlegendentry{NACA 4412}
+      \addplot[purple!80!black, thick, mark=diamond*, mark size=1.8pt] table[x=alpha, y=cl6412] {data/cl_alpha.dat};
+      \addlegendentry{NACA 6412}
+      \addplot[black!70, dashed, thick] table[x=alpha, y=cl_thin] {data/cl_alpha.dat};
+      \addlegendentry{薄翼理論 $2\pi\alpha$}
+
+      \node[anchor=north, font=\scriptsize, text=red!70!black, align=center] at (axis cs:14.0,0.45) {失速未考慮域\\($\alpha>12^\circ$)};
+    \end{axis}
+  \end{tikzpicture}
+  \caption{NACA 4 桁標準翼型群の $C_L$--$\alpha$ 曲線（$N=160$, 閉後縁）と高迎角警告域}
+  \label{fig:cl_alpha}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.80\textwidth,
+      height=5.6cm,
+      xlabel={無次元弦方向位置 $x/c$ [-]},
+      ylabel={負圧係数 $-C_p$ [-]},
+      xmin=0, xmax=1,
+      ymin=-1.2, ymax=2.2,
+      grid=major,
+      grid style={dashed,gray!30},
+      legend pos=north east,
+      legend style={font=\footnotesize, cells={anchor=west}, fill opacity=0.90},
+      tick label style={font=\footnotesize},
+      label style={font=\small},
+    ]
+      \draw[gray!60, thin] (axis cs:0,0) -- (axis cs:1,0);
+      \draw[gray!45, dotted] (axis cs:0,-1) -- (axis cs:1,-1);
+      \addplot[blue!75!black, thick] table[x=xc, y=neg_cp] {data/cp_naca2412_a5_upper.dat};
+      \addlegendentry{上面（負圧吸引）}
+      \addplot[red!75!black, thick, dashed] table[x=xc, y=neg_cp] {data/cp_naca2412_a5_lower.dat};
+      \addlegendentry{下面（正圧側）}
+      \node[anchor=west, font=\scriptsize, text=blue!65!black] at (axis cs:0.06,1.93) {$C_{p,\min}=-1.913$};
+      \node[anchor=west, font=\scriptsize, text=gray!70!black] at (axis cs:0.06,-0.88) {淀み点近傍 ($C_p \approx +1$)};
+    \end{axis}
+  \end{tikzpicture}
+  \caption{NACA 2412（$\alpha=5^\circ,\ N=160$）の表面圧力係数分布（上向きが負圧）}
+  \label{fig:cp_dist}
+\end{figure}
+
+\subsection{有限翼厚効果および後縁形状定義の影響}
+最大翼厚比 $t/c$ の異なる対称翼（NACA 0004--0024, $N=160$）について $\alpha=\pm 2^\circ$ より線形揚力傾斜を求め，ポテンシャル流れの翼厚補正近似式 $2\pi(1+0.77\,t/c)$ と比較した結果を表~\ref{tab:thickness} に示す．全翼厚域で $+0.61\%\sim +2.00\%$ 以内で一致し，NACA 0012 の揚力傾斜が $2\pi$ より $+10.5\%$ 高くなる物理的根拠を裏付ける．また閉後縁（$a_4=-0.1036$）と開後縁（$a_4=-0.1015$）を比較した結果（表~\ref{tab:te_def}），閉後縁は質量保存残差を NACA 2412 で約 $1/4$（\texttt{6.733e-4} vs \texttt{2.602e-3}）に低減できることが確認された．
+
+\begin{table}[H]
+  \centering
+  \caption{有限翼厚比 $t/c$ による揚力傾斜の増加（対称翼 NACA 00XX, $N=160$）}
+  \label{tab:thickness}
+  \small
+  \renewcommand{\arraystretch}{1.28}
+  \setlength{\tabcolsep}{7.5pt}
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    翼型 & 翼厚比 $t/c$ & パネル法 $dC_L/d\alpha$ [$/\mathrm{rad}$] & $2\pi(1+0.77\,t/c)$ [$/\mathrm{rad}$] & 対近似式相対差 & 対 $2\pi$ 比 \\
+    \midrule
+    \textbf{NACA 0004} & 0.04 & 6.5163 & 6.4767 & $+0.61\%$ & 1.0371 \\
+    \textbf{NACA 0009} & 0.09 & 6.7823 & 6.7186 & $+0.95\%$ & 1.0794 \\
+    \textbf{NACA 0012} & 0.12 & 6.9429 & 6.8638 & $+1.15\%$ & 1.1050 \\
+    \textbf{NACA 0018} & 0.18 & 7.2664 & 7.1540 & $+1.57\%$ & 1.1565 \\
+    \textbf{NACA 0024} & 0.24 & 7.5929 & 7.4443 & $+2.00\%$ & 1.2085 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{後縁形状定義（NASA TMR 閉後縁 $a_4=-0.1036$ vs Jacobs ら原典開後縁 $a_4=-0.1015$）の比較（$\alpha=5^\circ,\ N=160$）}
+  \label{tab:te_def}
+  \small
+  \renewcommand{\arraystretch}{1.28}
+  \setlength{\tabcolsep}{5.5pt}
+  \begin{tabular}{@{}llcccccc@{}}
+    \toprule
+    翼型 & 後縁仕様 & $C_{L,\mathrm{KJ}}$ & $C_{L,p}$ & $C_{m,c/4}$ & $|\Delta C_{p,\mathrm{TE}}|$ & 質量保存残差 & 条件数 $\kappa_2(M)$ \\
+    \midrule
+    NACA 0012 & 閉後縁 (\texttt{-0.1036}) & 0.605238 & 0.602487 & $-0.006480$ & \texttt{6.661e-16} & \texttt{1.200e-03} & 120.8 \\
+    NACA 0012 & 開後縁 (\texttt{-0.1015}) & 0.598694 & 0.597504 & $-0.006336$ & \texttt{3.331e-16} & \texttt{3.131e-03} & 106.8 \\
+    NACA 2412 & 閉後縁 (\texttt{-0.1036}) & 0.863846 & 0.857081 & $-0.061194$ & \texttt{0.000e+00} & \texttt{6.733e-04} & 120.9 \\
+    NACA 2412 & 開後縁 (\texttt{-0.1015}) & 0.855080 & 0.850351 & $-0.060992$ & \texttt{3.331e-16} & \texttt{2.602e-03} & 107.0 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{パネル数収束性と圧力抗力誤差}
+NACA 2412（$\alpha=5^\circ$）について $N=40\text{--}300$ でパネル数収束性を測定した結果を表~\ref{tab:convergence} および図~\ref{fig:convergence} に示す．$N\times(\text{相対差}) \approx 1.2$，$N\times(\text{質量残差}) \approx 0.107$ と一定値へ漸近し，定強さパネル法の理論収束次数である\textbf{一次収束 $O(1/N)$}（Katz \& Plotkin, 2001）が明確に実証された．また圧力積分による見かけの抗力誤差 $C_{D,p}$ は $N$ 増大に伴い単調にゼロへ減衰する非物理的離散誤差であり，Phase 1 における \texttt{cd: null} 強制の正当性が裏付けられる．標準設定 $N=160$ での解法時間は約 $4.1\text{--}4.7\,\mathrm{ms}$ であり，十分な対話応答性を有する．
+
+\begin{table}[H]
+  \centering
+  \caption{パネル数収束性・一次精度 $O(1/N)$ スケーリングおよびダランベール圧力抗力誤差（NACA 2412, $\alpha=5^\circ$）}
+  \label{tab:convergence}
+  \footnotesize
+  \renewcommand{\arraystretch}{1.28}
+  \setlength{\tabcolsep}{4.2pt}
+  \begin{tabular}{@{}rccccccccc@{}}
+    \toprule
+    $N$ & $C_{L,\mathrm{KJ}}$ & $C_{L,p}$ & $|\Delta C_L|/C_L$ & $N\times|\Delta C_L|/C_L$ & $C_{D,p}$（数値誤差） & $C_{m,c/4}$ & 質量残差 & $N\times\text{質量残差}$ & 時間 [ms] \\
+    \midrule
+    40  & 0.866274 & 0.840909 & 2.928\% & 1.1712 & \texttt{-4.920e-04} & $-0.056478$ & \texttt{2.816e-03} & 0.11264 & 0.42 \\
+    60  & 0.865786 & 0.848330 & 2.016\% & 1.2097 & \texttt{-5.082e-04} & $-0.058590$ & \texttt{1.838e-03} & 0.11031 & 0.63 \\
+    80  & 0.865208 & 0.851939 & 1.534\% & 1.2269 & \texttt{-4.507e-04} & $-0.059638$ & \texttt{1.365e-03} & 0.10919 & 0.89 \\
+    120 & 0.864374 & 0.855411 & 1.037\% & 1.2443 & \texttt{-3.431e-04} & $-0.060680$ & \texttt{9.016e-04} & 0.10819 & 2.78 \\
+    160 & 0.863846 & 0.857081 & 0.783\% & 1.2530 & \texttt{-2.721e-04} & $-0.061194$ & \texttt{6.733e-04} & 0.10772 & 4.11 \\
+    240 & 0.863234 & 0.858695 & 0.526\% & 1.2619 & \texttt{-1.907e-04} & $-0.061700$ & \texttt{4.470e-04} & 0.10728 & 10.66 \\
+    300 & 0.862963 & 0.859323 & 0.422\% & 1.2655 & \texttt{-1.554e-04} & $-0.061900$ & \texttt{3.570e-04} & 0.10711 & 19.64 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \begin{tikzpicture}
+    \begin{loglogaxis}[
+      width=0.80\textwidth,
+      height=5.6cm,
+      xlabel={パネル数 $N$ [-]},
+      ylabel={誤差・残差指標 [-]},
+      xmin=35, xmax=340,
+      ymin=1e-4, ymax=6e-2,
+      xtick={40,60,80,120,160,240,300},
+      xticklabels={40,60,80,120,160,240,300},
+      grid=major,
+      grid style={dashed,gray!30},
+      legend pos=south west,
+      legend style={font=\footnotesize, cells={anchor=west}, fill opacity=0.90},
+      tick label style={font=\footnotesize},
+      label style={font=\small},
+    ]
+      \addplot[blue!75!black, thick, mark=square*, mark size=1.8pt] table[x=N, y=rel_cl] {data/convergence_naca2412.dat};
+      \addlegendentry{$|\Delta C_L|/C_L$ クロスチェック差}
+      \addplot[teal!70!black, thick, mark=*, mark size=1.6pt] table[x=N, y=mass_res] {data/convergence_naca2412.dat};
+      \addlegendentry{質量保存残差 $|\sum \hat{\sigma}_j\hat{S}_j|$}
+      \addplot[red!75!black, thick, mark=triangle*, mark size=1.8pt] table[x=N, y=abs_cdp] {data/convergence_naca2412.dat};
+      \addlegendentry{$|C_{D,p}|$（数値抗力誤差）}
+      \addplot[black!75, dashed, thick] table[x=N, y=ref_inv_n] {data/convergence_naca2412.dat};
+      \addlegendentry{一次収束基準 $O(N^{-1})$}
+    \end{loglogaxis}
+  \end{tikzpicture}
+  \caption{パネル数収束性の両対数プロット（NACA 2412, $\alpha=5^\circ$）}
+  \label{fig:convergence}
+\end{figure}
+
+\subsection{高迎角域の限界および ISA 標準大気物性値の検証}
+$\alpha = 15^\circ$（$N=160$）では，パネル法は NACA 0012 で $C_L=1.7973$（$C_{p,\min}=-12.859$），NACA 2412 で $2.0481$，4412 で $2.2979$，6412 で $2.5458$ を算出する．しかし Abbott \& von Doenhoff (1959) の実測では 12\% 厚 NACA 翼型は $\alpha_{\text{stall}} \approx 14^\circ\text{--}16^\circ$ で失速し，$C_{l,\max}$ は 2412/4412/6412 で $1.5\text{--}1.8$ 程度にとどまる．したがって $|\alpha|>10^\circ, 12^\circ$ で段階的に警告を発火させる \texttt{warnings.py} の閾値は妥当である．
+
+また，Sutherland 式および理想気体則の検証結果（表~\ref{tab:isa}）では，ISA 標準大気（$15^\circ\mathrm{C}, 1\,\mathrm{atm}$）の標準参照値（$\rho=1.225\,\mathrm{kg/m^3},\ \mu=1.7894\times 10^{-5}\,\mathrm{Pa\cdot s},\ a=340.294\,\mathrm{m/s}$）と $0.006\%$ 以内で一致した．
+
+\begin{table}[H]
+  \centering
+  \caption{Sutherland 粘性式・理想気体状態方程式・音速のベンチマーク比較}
+  \label{tab:isa}
+  \small
+  \renewcommand{\arraystretch}{1.28}
+  \setlength{\tabcolsep}{7.5pt}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    条件 & 密度 $\rho$ [$\mathrm{kg/m^3}$] & 粘性係数 $\mu$ [$\mathrm{Pa\cdot s}$] & 動粘性係数 $\nu$ [$\mathrm{m^2/s}$] & 音速 $a$ [$\mathrm{m/s}$] \\
+    \midrule
+    ISA 標準大気 ($15^\circ\mathrm{C}$, $1\,\mathrm{atm}$) & 1.22498 & \texttt{1.78930e-05} & \texttt{1.46068e-05} & 340.297 \\
+    AirFlow Lab 標準空気 ($20^\circ\mathrm{C}$) & 1.20408 & \texttt{1.81332e-05} & \texttt{1.50598e-05} & 343.237 \\
+    AirFlow Lab 標準空気 ($0^\circ\mathrm{C}$)  & 1.29225 & \texttt{1.71600e-05} & \texttt{1.32792e-05} & 331.321 \\
+    AirFlow Lab 標準水 ($20^\circ\mathrm{C}$)   & 998.20000 & \texttt{1.00200e-03} & \texttt{1.00381e-06} & 1482.000 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% ============================================================================
+% 4. 今後の改善課題
+% ============================================================================
+\section{監査で抽出された制約と今後の課題}
+
+\begin{enumerate}\setlength{\itemsep}{3pt}\setlength{\parskip}{0pt}
+  \item \textbf{局所マッハ数推定の非圧縮近似性:} \texttt{warnings.py} L91 は $M_{\mathrm{local}} \approx M_\infty (|V|_{\max}/V_\infty)$ を用いている．簡便な安全側目安としては有効だが，高亜音速境界の厳密判定には等エントロピー臨界圧力係数 $C_{p,\mathrm{cr}}(M_\infty)$ や Prandtl--Glauert 補正（Anderson, 2017）の導入が望ましい．
+  \item \textbf{低迎角線形域での粘性デキャンバー差の補足:} 今後の風洞実験比較に向け，低迎角域でも境界層排除厚の欠如と翼厚効果により実測より $C_L$ が $15\text{--}30\%$ 程度高く出得る旨を教育解説へ追記すると親切である．
+  \item \textbf{低レイノルズ数域と Phase 2 XFOIL 連成:} 小型風洞規模（$Re \approx 5\times 10^4\text{--}5\times 10^5$）では層流剥離泡・遷移（Drela, 1989）が顕著になるため，Phase 2 における XFOIL 連携による粘性抗力 $C_D$ 算出が不可欠である．
+  \item \textbf{高次パネル定式化への拡張:} 定強さパネル法は $N=160$ で約 $4.4\,\mathrm{ms}$ と高速だが，高曲率前縁のさらなる高精度化には線形渦パネル（$O(1/N^2)$ 精度）への拡張も今後の選択肢となる．
+\end{enumerate}
+
+% ============================================================================
+% 5. 結論
+% ============================================================================
+\section{結論}
+
+一次学術文献と基準実験データに対する整合性監査および定量検証の結果，AirFlow Lab（Phase 1）の座標生成，Hess--Smith パネル法ソルバー，物性推算，数値破綻遮断（Gate 2），ならびに教育的解説エンジンは 2 次元ポテンシャル流れの理論体系と厳密に整合していることが確認された．計算可能な数値精度と計算不能な物理限界の誠実な明示が両立されており，高校生向け学習基盤および今後の粘性連成拡張の堅牢な土台が完成した．
+
+% ============================================================================
+% 参考文献
+% ============================================================================
+\begingroup
+\raggedright
+\begin{thebibliography}{99}
+\setlength{\itemsep}{3pt}\setlength{\parskip}{0pt}
+\small
+\bibitem{hess1967} Hess, J.\ L., \& Smith, A.\ M.\ O. (1967). Calculation of potential flow about arbitrary bodies. \textit{Progress in Aeronautical Sciences}, 8, 1--138.
+\bibitem{hess1990} Hess, J.\ L. (1990). Panel Methods in Computational Fluid Dynamics. \textit{Annual Review of Fluid Mechanics}, 22, 255--274. \url{https://doi.org/10.1146/annurev.fl.22.010190.001351}
+\bibitem{katz2001} Katz, J., \& Plotkin, A. (2001). \textit{Low-Speed Aerodynamics} (2nd ed.). Cambridge Aerospace Series No.\ 13, Cambridge University Press.
+\bibitem{abbott1959} Abbott, I.\ H., \& von Doenhoff, A.\ E. (1959). \textit{Theory of Wing Sections: Including a Summary of Airfoil Data}. Dover Publications (originally McGraw-Hill, 1949; NACA Report No.\ 824).
+\bibitem{jacobs1933} Jacobs, E.\ N., Ward, K.\ E., \& Pinkerton, R.\ M. (1933). \textit{The Characteristics of 78 Related Airfoil Sections from Tests in the Variable-Density Wind Tunnel}. NACA Report No.\ 460.
+\bibitem{ladson1988} Ladson, C.\ L. (1988). \textit{Effects of Independent Variation of Mach and Reynolds Numbers on the Low-Speed Aerodynamic Characteristics of the NACA 0012 Airfoil Section}. NASA TM-4074.
+\bibitem{gregory1970} Gregory, N., \& O'Reilly, C.\ L. (1970). \textit{Low-Speed Aerodynamic Characteristics of NACA 0012 Aerofoil Section, including the Effects of Upper-Surface Roughness Simulating Hoar Frost}. ARC R\&M No.\ 3726.
+\bibitem{anderson2017} Anderson, J.\ D. (2017). \textit{Fundamentals of Aerodynamics} (6th ed.). McGraw-Hill Education.
+\bibitem{drela1989} Drela, M. (1989). XFOIL: An Analysis and Design System for Low Reynolds Number Airfoils. In T.\ J.\ Mueller (Ed.), \textit{Low Reynolds Number Aerodynamics}, Lecture Notes in Engineering, Vol.\ 54, pp.\ 1--12, Springer-Verlag. \url{https://doi.org/10.1007/978-3-642-84010-4_1}
+\bibitem{babinsky2003} Babinsky, H. (2003). How do wings work? \textit{Physics Education}, 38(6), 497--503.
+\bibitem{sutherland1893} Sutherland, W. (1893). The viscosity of gases and molecular force. \textit{Philosophical Magazine}, Series 5, 36(223), 507--531. \url{https://doi.org/10.1080/14786449308620508}
+\bibitem{benson_foilsim} Benson, T. / NASA Glenn Research Center. \textit{Beginner's Guide to Aeronautics --- FoilSim Interactive Airfoil Simulator}. NASA.
+\end{thebibliography}
+\endgroup
+
+\end{document}

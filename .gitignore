@@ -1,0 +1,29 @@
+# Dependencies & build outputs
+node_modules
+frontend/node_modules
+frontend/dist/
+pages_dist/
+
+# Python environments & caches
+.venv
+venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# TeX intermediate artifacts (compiled PDFs are tracked intentionally)
+docs/paper/*.aux
+docs/paper/*.log
+docs/paper/*.out
+docs/paper/*.toc
+docs/paper/*.fls
+docs/paper/*.fdb_latexmk
+
+# Local environment overrides & OS metadata
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db

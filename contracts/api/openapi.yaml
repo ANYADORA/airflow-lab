@@ -1,0 +1,950 @@
+openapi: 3.1.0
+info:
+  title: AirFlow Lab API
+  version: 0.1.0
+  description: |
+    高校生・初学者向け 2次元翼型流れ解析 Web アプリケーション「AirFlow Lab」の REST API 契約定義。
+    Phase 1 では Hess-Smith 2D 非粘性・非圧縮ポテンシャル流れパネル法を提供する。
+    簡易モードと本格モードは完全に同一の API エンドポイント・データスキーマを使用する。
+servers:
+  - url: http://localhost:8000
+    description: ローカル開発環境 (FastAPI)
+
+tags:
+  - name: system
+    description: システム稼働状態・ソルバー対応状況
+  - name: airfoils
+    description: 標準翼型プリセット・翼型座標生成・カスタムDAT/CSV前処理
+  - name: analysis
+    description: 2D翼型流れ解析・結果取得・2条件比較
+
+paths:
+  /api/health:
+    get:
+      tags: [system]
+      summary: API 稼働確認および利用可能ソルバー一覧
+      operationId: getHealth
+      responses:
+        '200':
+          description: 正常応答
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/airfoils:
+    get:
+      tags: [airfoils]
+      summary: 標準プリセット翼型（NACA 0012 / 2412 / 4412 / 6412）一覧取得
+      operationId: listAirfoilPresets
+      responses:
+        '200':
+          description: 標準翼型一覧
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AirfoilPresetListResponse'
+
+  /api/airfoils/generate:
+    post:
+      tags: [airfoils]
+      summary: NACA 4桁またはカスタム DAT/CSV から翼型座標を生成・検証
+      operationId: generateAirfoil
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AirfoilGenerateRequest'
+      responses:
+        '200':
+          description: 生成・正規化済み翼型座標と幾何特性
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AirfoilGenerateResponse'
+        '422':
+          description: 不正な NACA コード、点数不足、自己交差座標などのバリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analysis/run:
+    post:
+      tags: [analysis]
+      summary: 2D翼型流れ解析を実行（簡易モード・本格モード共通）
+      operationId: runAnalysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisRequest'
+      responses:
+        '200':
+          description: 解析完了（status="success"）または数値的非収束・破綻（status="failed"）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '422':
+          description: 入力バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: 未実装ソルバー（xfoil / cfd_su2）が指定された場合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analysis/{analysis_id}:
+    get:
+      tags: [analysis]
+      summary: 実行済み解析結果を ID 指定で取得
+      operationId: getAnalysisById
+      parameters:
+        - name: analysis_id
+          in: path
+          required: true
+          description: 解析結果の UUID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 解析結果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisResponse'
+        '404':
+          description: 指定された analysis_id が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/analysis/compare:
+    post:
+      tags: [analysis]
+      summary: 2つの解析条件（base と target）を比較し差分を返却
+      operationId: compareAnalyses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompareRequest'
+      responses:
+        '200':
+          description: 2条件の解析結果および主要 KPI 差分
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompareResponse'
+        '404':
+          description: 指定された analysis_id が存在しない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: 入力バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '501':
+          description: 未実装ソルバー指定時
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: [object, 'null']
+
+    WarningItem:
+      type: object
+      additionalProperties: false
+      required: [code, severity, title, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - HIGH_AOA_CAUTION
+            - STALL_UNMODELED
+            - COMPRESSIBILITY_CAUTION
+            - TRANSONIC_OUT_OF_RANGE
+            - LOW_RE_CAUTION
+            - CL_CROSSCHECK_WARN
+            - CUSTOM_AIRFOIL_NORMALIZED
+            - OPEN_TE_CLOSED_AUTO
+        severity:
+          type: string
+          enum: [info, warning, critical]
+        title:
+          type: string
+        message:
+          type: string
+
+    SolverCapability:
+      type: object
+      additionalProperties: false
+      required: [method, label, available, phase, supports_cd, description]
+      properties:
+        method:
+          type: string
+          enum: [panel_method, xfoil, cfd_su2]
+        label:
+          type: string
+        available:
+          type: boolean
+        phase:
+          type: integer
+          enum: [1, 2, 3]
+        supports_cd:
+          type: boolean
+        description:
+          type: string
+
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status, version, solvers]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+        solvers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SolverCapability'
+
+    AirfoilPresetItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - naca_code
+        - is_symmetric
+        - max_thickness_ratio
+        - max_camber_ratio
+        - max_camber_pos
+        - description
+        - preview_coords
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        naca_code:
+          type: string
+          pattern: '^[0-9]{4}$'
+        is_symmetric:
+          type: boolean
+        max_thickness_ratio:
+          type: number
+        max_camber_ratio:
+          type: number
+        max_camber_pos:
+          type: number
+        description:
+          type: string
+        preview_coords:
+          type: object
+          additionalProperties: false
+          required: [x, y]
+          properties:
+            x:
+              type: array
+              items: { type: number }
+            y:
+              type: array
+              items: { type: number }
+
+    AirfoilPresetListResponse:
+      type: object
+      additionalProperties: false
+      required: [presets]
+      properties:
+        presets:
+          type: array
+          items:
+            $ref: '#/components/schemas/AirfoilPresetItem'
+
+    AirfoilInput:
+      type: object
+      additionalProperties: false
+      required: [source_type]
+      properties:
+        source_type:
+          type: string
+          enum: [naca4, custom_dat, custom_csv]
+        naca_code:
+          type: [string, 'null']
+          pattern: '^[0-9]{4}$'
+          default: null
+        name:
+          type: [string, 'null']
+          maxLength: 120
+          default: null
+        raw_coordinates_text:
+          type: [string, 'null']
+          default: null
+      allOf:
+        - if:
+            properties:
+              source_type: { const: naca4 }
+          then:
+            required: [naca_code]
+            properties:
+              naca_code: { type: string, pattern: '^[0-9]{4}$' }
+        - if:
+            properties:
+              source_type: { enum: [custom_dat, custom_csv] }
+          then:
+            required: [raw_coordinates_text]
+            properties:
+              raw_coordinates_text: { type: string, minLength: 10 }
+
+    AirfoilGenerateRequest:
+      type: object
+      additionalProperties: false
+      required: [source_type]
+      properties:
+        source_type:
+          type: string
+          enum: [naca4, custom_dat, custom_csv]
+        naca_code:
+          type: [string, 'null']
+          pattern: '^[0-9]{4}$'
+          default: null
+        name:
+          type: [string, 'null']
+          maxLength: 120
+          default: null
+        raw_coordinates_text:
+          type: [string, 'null']
+          default: null
+        num_panels:
+          type: integer
+          minimum: 40
+          maximum: 300
+          multipleOf: 2
+          default: 160
+        closed_te:
+          type: boolean
+          default: true
+      allOf:
+        - if:
+            properties:
+              source_type: { const: naca4 }
+          then:
+            required: [naca_code]
+            properties:
+              naca_code: { type: string, pattern: '^[0-9]{4}$' }
+        - if:
+            properties:
+              source_type: { enum: [custom_dat, custom_csv] }
+          then:
+            required: [raw_coordinates_text]
+            properties:
+              raw_coordinates_text: { type: string, minLength: 10 }
+
+    AirfoilGeometrySummary:
+      type: object
+      additionalProperties: false
+      required:
+        - num_panels
+        - max_thickness_ratio
+        - max_camber_ratio
+        - max_camber_pos
+        - is_symmetric
+        - is_closed_te
+      properties:
+        num_panels:
+          type: integer
+          minimum: 40
+          maximum: 300
+        max_thickness_ratio:
+          type: number
+          minimum: 0.0
+        max_camber_ratio:
+          type: number
+        max_camber_pos:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+        is_symmetric:
+          type: boolean
+        is_closed_te:
+          type: boolean
+
+    AirfoilGenerateResponse:
+      type: object
+      additionalProperties: false
+      required: [name, coordinates, geometry, warnings]
+      properties:
+        name:
+          type: string
+        coordinates:
+          type: object
+          additionalProperties: false
+          required: [x, y]
+          properties:
+            x:
+              type: array
+              items: { type: number }
+            y:
+              type: array
+              items: { type: number }
+        geometry:
+          $ref: '#/components/schemas/AirfoilGeometrySummary'
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/WarningItem'
+
+    FluidPropertiesInput:
+      type: object
+      additionalProperties: false
+      required: [mode, temperature_k]
+      properties:
+        preset:
+          type: string
+          enum: [air_std_20c, air_0c, water_20c, custom]
+          default: air_std_20c
+        mode:
+          type: string
+          enum: [temperature_auto, direct_mu, direct_nu]
+          default: temperature_auto
+        temperature_k:
+          type: number
+          minimum: 50.0
+          maximum: 2000.0
+          default: 293.15
+        static_pressure_pa:
+          type: [number, 'null']
+          exclusiveMinimum: 0.0
+          default: 101325.0
+        density_kg_m3:
+          type: [number, 'null']
+          exclusiveMinimum: 0.0
+          default: null
+        dynamic_viscosity_pa_s:
+          type: [number, 'null']
+          exclusiveMinimum: 0.0
+          default: null
+        kinematic_viscosity_m2_s:
+          type: [number, 'null']
+          exclusiveMinimum: 0.0
+          default: null
+        speed_of_sound_mps:
+          type: [number, 'null']
+          exclusiveMinimum: 0.0
+          default: null
+      allOf:
+        - if:
+            properties:
+              mode: { const: direct_mu }
+          then:
+            required: [density_kg_m3, dynamic_viscosity_pa_s]
+            properties:
+              density_kg_m3: { type: number, exclusiveMinimum: 0.0 }
+              dynamic_viscosity_pa_s: { type: number, exclusiveMinimum: 0.0 }
+        - if:
+            properties:
+              mode: { const: direct_nu }
+          then:
+            required: [density_kg_m3, kinematic_viscosity_m2_s]
+            properties:
+              density_kg_m3: { type: number, exclusiveMinimum: 0.0 }
+              kinematic_viscosity_m2_s: { type: number, exclusiveMinimum: 0.0 }
+        - if:
+            required: [density_kg_m3]
+            properties:
+              preset: { const: custom }
+              mode: { enum: [direct_mu, direct_nu] }
+              density_kg_m3: { type: number, exclusiveMinimum: 10.0 }
+          then:
+            required: [speed_of_sound_mps]
+            properties:
+              speed_of_sound_mps: { type: number, exclusiveMinimum: 0.0 }
+
+    SolverInput:
+      type: object
+      additionalProperties: false
+      required: [method]
+      properties:
+        method:
+          type: string
+          enum: [panel_method, xfoil, cfd_su2]
+          default: panel_method
+
+    NumericalSettingsInput:
+      type: object
+      additionalProperties: false
+      required:
+        - num_panels
+        - closed_te
+        - grid_nx
+        - grid_ny
+        - x_range
+        - y_range
+        - num_streamlines
+      properties:
+        num_panels:
+          type: integer
+          minimum: 40
+          maximum: 300
+          multipleOf: 2
+          default: 160
+        closed_te:
+          type: boolean
+          default: true
+        grid_nx:
+          type: integer
+          minimum: 40
+          maximum: 240
+          default: 120
+        grid_ny:
+          type: integer
+          minimum: 30
+          maximum: 180
+          default: 80
+        x_range:
+          type: array
+          prefixItems:
+            - type: number
+              minimum: -5.0
+              exclusiveMaximum: 0.0
+            - type: number
+              exclusiveMinimum: 1.0
+              maximum: 5.0
+          minItems: 2
+          maxItems: 2
+          items: false
+          default: [-0.5, 1.6]
+        y_range:
+          type: array
+          prefixItems:
+            - type: number
+              minimum: -5.0
+              exclusiveMaximum: 0.0
+            - type: number
+              exclusiveMinimum: 0.0
+              maximum: 5.0
+          minItems: 2
+          maxItems: 2
+          items: false
+          default: [-0.7, 0.7]
+        num_streamlines:
+          type: integer
+          minimum: 10
+          maximum: 60
+          default: 28
+
+    AnalysisRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - airfoil
+        - angle_of_attack
+        - velocity
+        - chord_length
+        - fluid_properties
+        - solver
+        - numerical_settings
+      properties:
+        airfoil:
+          $ref: '#/components/schemas/AirfoilInput'
+        angle_of_attack:
+          type: number
+          minimum: -45.0
+          maximum: 45.0
+          default: 4.0
+        velocity:
+          type: number
+          minimum: 0.01
+          maximum: 1000.0
+          default: 15.0
+        chord_length:
+          type: number
+          minimum: 0.0001
+          maximum: 100.0
+          default: 0.2
+        fluid_properties:
+          $ref: '#/components/schemas/FluidPropertiesInput'
+        solver:
+          $ref: '#/components/schemas/SolverInput'
+        numerical_settings:
+          $ref: '#/components/schemas/NumericalSettingsInput'
+
+    SolverInfo:
+      type: object
+      additionalProperties: false
+      required: [method, model_type, version, supports_cd]
+      properties:
+        method:
+          type: string
+          enum: [panel_method, xfoil, cfd_su2]
+        model_type:
+          type: string
+        version:
+          type: string
+        supports_cd:
+          type: boolean
+
+    ResolvedFluid:
+      type: object
+      additionalProperties: false
+      required:
+        - density_kg_m3
+        - dynamic_viscosity_pa_s
+        - kinematic_viscosity_m2_s
+        - temperature_k
+        - static_pressure_pa
+        - speed_of_sound_mps
+      properties:
+        density_kg_m3: { type: number, exclusiveMinimum: 0.0 }
+        dynamic_viscosity_pa_s: { type: number, exclusiveMinimum: 0.0 }
+        kinematic_viscosity_m2_s: { type: number, exclusiveMinimum: 0.0 }
+        temperature_k: { type: number, exclusiveMinimum: 0.0 }
+        static_pressure_pa: { type: number, exclusiveMinimum: 0.0 }
+        speed_of_sound_mps: { type: number, exclusiveMinimum: 0.0 }
+
+    AirfoilGeometryResult:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - x
+        - y
+        - num_panels
+        - max_thickness_ratio
+        - max_camber_ratio
+        - max_camber_pos
+        - is_symmetric
+        - is_closed_te
+      properties:
+        name: { type: string }
+        x: { type: array, items: { type: number } }
+        y: { type: array, items: { type: number } }
+        num_panels: { type: integer, minimum: 40, maximum: 300 }
+        max_thickness_ratio: { type: number, minimum: 0.0 }
+        max_camber_ratio: { type: number }
+        max_camber_pos: { type: number, minimum: 0.0, maximum: 1.0 }
+        is_symmetric: { type: boolean }
+        is_closed_te: { type: boolean }
+
+    DimensionlessNumbers:
+      type: object
+      additionalProperties: false
+      required: [reynolds_number, mach_number]
+      properties:
+        reynolds_number: { type: number, exclusiveMinimum: 0.0 }
+        mach_number: { type: number, minimum: 0.0 }
+
+    AerodynamicCoefficients:
+      type: object
+      additionalProperties: false
+      required:
+        - cl
+        - cl_kutta_joukowski
+        - cl_pressure_integration
+        - cd
+        - cd_unavailable_reason
+        - cm_quarter_chord
+      properties:
+        cl: { type: number }
+        cl_kutta_joukowski: { type: number }
+        cl_pressure_integration: { type: number }
+        cd:
+          type: [number, 'null']
+          description: Phase 1 非粘性パネル法では常時 null
+        cd_unavailable_reason:
+          type: [string, 'null']
+        cm_quarter_chord:
+          type: number
+          description: 1/4弦点周りモーメント係数（頭上げ正）
+
+    AnalysisDiagnostics:
+      type: object
+      additionalProperties: false
+      required:
+        - converged
+        - condition_number
+        - linear_residual_max
+        - te_cp_diff
+        - cl_discrepancy
+        - cl_discrepancy_relative
+        - cd_pressure_numerical_error
+        - cp_min
+        - cp_min_xc
+        - max_velocity_ratio
+        - compute_time_ms
+      properties:
+        converged: { type: boolean }
+        condition_number: { type: [number, 'null'] }
+        linear_residual_max: { type: [number, 'null'] }
+        te_cp_diff: { type: [number, 'null'] }
+        cl_discrepancy: { type: [number, 'null'] }
+        cl_discrepancy_relative: { type: [number, 'null'] }
+        cd_pressure_numerical_error: { type: [number, 'null'] }
+        cp_min: { type: [number, 'null'] }
+        cp_min_xc: { type: [number, 'null'] }
+        max_velocity_ratio: { type: [number, 'null'] }
+        compute_time_ms: { type: number, minimum: 0.0 }
+
+    SurfaceDistribution:
+      type: object
+      additionalProperties: false
+      required: [x_c, y_c, side, cp, vt_ratio]
+      properties:
+        x_c: { type: array, items: { type: number } }
+        y_c: { type: array, items: { type: number } }
+        side:
+          type: array
+          items: { type: string, enum: [upper, lower] }
+        cp: { type: array, items: { type: number } }
+        vt_ratio: { type: array, items: { type: number } }
+
+    FlowFieldData:
+      type: object
+      description: 2次元配列はすべて形状 [grid_ny][grid_nx]（外側 y_grid 昇順、内側 x_grid 昇順）
+      additionalProperties: false
+      required:
+        - x_grid
+        - y_grid
+        - u_ratio
+        - v_ratio
+        - speed_ratio
+        - cp
+        - is_inside_airfoil
+      properties:
+        x_grid: { type: array, items: { type: number } }
+        y_grid: { type: array, items: { type: number } }
+        u_ratio:
+          type: array
+          items:
+            type: array
+            items: { type: [number, 'null'] }
+        v_ratio:
+          type: array
+          items:
+            type: array
+            items: { type: [number, 'null'] }
+        speed_ratio:
+          type: array
+          items:
+            type: array
+            items: { type: [number, 'null'] }
+        cp:
+          type: array
+          items:
+            type: array
+            items: { type: [number, 'null'] }
+        is_inside_airfoil:
+          type: array
+          items:
+            type: array
+            items: { type: boolean }
+
+    StreamlinePolyline:
+      type: object
+      additionalProperties: false
+      required: [x, y]
+      properties:
+        x: { type: array, items: { type: number } }
+        y: { type: array, items: { type: number } }
+
+    FailureInfo:
+      type: object
+      additionalProperties: false
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: [object, 'null'] }
+
+    AnalysisResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - analysis_id
+        - created_at
+        - status
+        - solver_info
+        - inputs
+        - resolved_fluid
+        - airfoil_geometry
+        - dimensionless
+        - coefficients
+        - diagnostics
+        - surface
+        - flow_field
+        - streamlines
+        - warnings
+        - failure
+      properties:
+        analysis_id: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        status: { type: string, enum: [success, failed] }
+        solver_info: { $ref: '#/components/schemas/SolverInfo' }
+        inputs: { $ref: '#/components/schemas/AnalysisRequest' }
+        resolved_fluid: { $ref: '#/components/schemas/ResolvedFluid' }
+        airfoil_geometry:
+          oneOf:
+            - $ref: '#/components/schemas/AirfoilGeometryResult'
+            - type: 'null'
+        dimensionless: { $ref: '#/components/schemas/DimensionlessNumbers' }
+        coefficients:
+          oneOf:
+            - $ref: '#/components/schemas/AerodynamicCoefficients'
+            - type: 'null'
+        diagnostics: { $ref: '#/components/schemas/AnalysisDiagnostics' }
+        surface:
+          oneOf:
+            - $ref: '#/components/schemas/SurfaceDistribution'
+            - type: 'null'
+        flow_field:
+          oneOf:
+            - $ref: '#/components/schemas/FlowFieldData'
+            - type: 'null'
+        streamlines:
+          oneOf:
+            - type: array
+              items: { $ref: '#/components/schemas/StreamlinePolyline' }
+            - type: 'null'
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/WarningItem' }
+        failure:
+          oneOf:
+            - $ref: '#/components/schemas/FailureInfo'
+            - type: 'null'
+      allOf:
+        - if:
+            properties:
+              status: { const: success }
+          then:
+            properties:
+              coefficients: { type: object }
+              surface: { type: object }
+              flow_field: { type: object }
+              streamlines: { type: array }
+              failure: { type: 'null' }
+        - if:
+            properties:
+              status: { const: failed }
+          then:
+            properties:
+              coefficients: { type: 'null' }
+              surface: { type: 'null' }
+              flow_field: { type: 'null' }
+              streamlines: { type: 'null' }
+              failure: { type: object }
+        - if:
+            properties:
+              status: { const: success }
+              solver_info:
+                properties:
+                  supports_cd: { const: false }
+          then:
+            properties:
+              coefficients:
+                type: object
+                properties:
+                  cd: { type: 'null' }
+                  cd_unavailable_reason: { type: string, minLength: 1 }
+
+    CompareRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        base_analysis_id:
+          type: [string, 'null']
+          format: uuid
+        target_analysis_id:
+          type: [string, 'null']
+          format: uuid
+        base_request:
+          oneOf:
+            - $ref: '#/components/schemas/AnalysisRequest'
+            - type: 'null'
+        target_request:
+          oneOf:
+            - $ref: '#/components/schemas/AnalysisRequest'
+            - type: 'null'
+      allOf:
+        - oneOf:
+            - required: [base_analysis_id]
+              properties:
+                base_analysis_id: { type: string, format: uuid }
+                base_request: { type: 'null' }
+            - required: [base_request]
+              properties:
+                base_request: { $ref: '#/components/schemas/AnalysisRequest' }
+                base_analysis_id: { type: 'null' }
+        - oneOf:
+            - required: [target_analysis_id]
+              properties:
+                target_analysis_id: { type: string, format: uuid }
+                target_request: { type: 'null' }
+            - required: [target_request]
+              properties:
+                target_request: { $ref: '#/components/schemas/AnalysisRequest' }
+                target_analysis_id: { type: 'null' }
+
+    CompareDiff:
+      type: object
+      additionalProperties: false
+      required:
+        - delta_cl
+        - delta_cm_quarter_chord
+        - delta_cd
+        - delta_cp_min
+        - delta_reynolds_number
+        - delta_mach_number
+      properties:
+        delta_cl: { type: [number, 'null'] }
+        delta_cm_quarter_chord: { type: [number, 'null'] }
+        delta_cd:
+          type: [number, 'null']
+          description: Phase 1 では常時 null
+        delta_cp_min: { type: [number, 'null'] }
+        delta_reynolds_number: { type: number }
+        delta_mach_number: { type: number }
+
+    CompareResponse:
+      type: object
+      additionalProperties: false
+      required: [base, target, diff]
+      properties:
+        base: { $ref: '#/components/schemas/AnalysisResponse' }
+        target: { $ref: '#/components/schemas/AnalysisResponse' }
+        diff: { $ref: '#/components/schemas/CompareDiff' }

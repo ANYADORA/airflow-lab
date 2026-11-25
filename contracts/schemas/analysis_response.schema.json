@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://airflowlab.local/contracts/schemas/analysis_response.schema.json",
+  "title": "AnalysisResponse",
+  "description": "AirFlow Lab POST /api/analysis/run および GET /api/analysis/{analysis_id} のレスポンススキーマ",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "analysis_id",
+    "created_at",
+    "status",
+    "solver_info",
+    "inputs",
+    "resolved_fluid",
+    "airfoil_geometry",
+    "dimensionless",
+    "coefficients",
+    "diagnostics",
+    "surface",
+    "flow_field",
+    "streamlines",
+    "warnings",
+    "failure"
+  ],
+  "properties": {
+    "analysis_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "解析結果の一意識別子（UUID v4）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "解析完了日時（ISO 8601 UTC）"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failed"],
+      "description": "解析成否。failed 時は coefficients / surface / flow_field / streamlines がすべて null となる。"
+    },
+    "solver_info": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "model_type", "version", "supports_cd"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["panel_method", "xfoil", "cfd_su2"]
+        },
+        "model_type": {
+          "type": "string",
+          "description": "物理モデル種別（Phase 1: 'inviscid_incompressible_potential'）"
+        },
+        "version": {
+          "type": "string"
+        },
+        "supports_cd": {
+          "type": "boolean",
+          "description": "抗力係数 CD を物理的に算出できるソルバーか（Phase 1 パネル法では false）"
+        }
+      }
+    },
+    "inputs": {
+      "$ref": "https://airflowlab.local/contracts/schemas/analysis_request.schema.json",
+      "description": "実行時に適用された正規化済みリクエスト（7キーのエコーバック）"
+    },
+    "resolved_fluid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "density_kg_m3",
+        "dynamic_viscosity_pa_s",
+        "kinematic_viscosity_m2_s",
+        "temperature_k",
+        "static_pressure_pa",
+        "speed_of_sound_mps"
+      ],
+      "properties": {
+        "density_kg_m3": { "type": "number", "exclusiveMinimum": 0.0 },
+        "dynamic_viscosity_pa_s": { "type": "number", "exclusiveMinimum": 0.0 },
+        "kinematic_viscosity_m2_s": { "type": "number", "exclusiveMinimum": 0.0 },
+        "temperature_k": { "type": "number", "exclusiveMinimum": 0.0 },
+        "static_pressure_pa": { "type": "number", "exclusiveMinimum": 0.0 },
+        "speed_of_sound_mps": { "type": "number", "exclusiveMinimum": 0.0 }
+      }
+    },
+    "airfoil_geometry": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "x",
+        "y",
+        "num_panels",
+        "max_thickness_ratio",
+        "max_camber_ratio",
+        "max_camber_pos",
+        "is_symmetric",
+        "is_closed_te"
+      ],
+      "properties": {
+        "name": { "type": "string" },
+        "x": { "type": "array", "items": { "type": "number" } },
+        "y": { "type": "array", "items": { "type": "number" } },
+        "num_panels": { "type": "integer", "minimum": 40, "maximum": 300 },
+        "max_thickness_ratio": { "type": "number", "minimum": 0.0 },
+        "max_camber_ratio": { "type": "number" },
+        "max_camber_pos": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "is_symmetric": { "type": "boolean" },
+        "is_closed_te": { "type": "boolean" }
+      }
+    },
+    "dimensionless": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reynolds_number", "mach_number"],
+      "properties": {
+        "reynolds_number": { "type": "number", "exclusiveMinimum": 0.0 },
+        "mach_number": { "type": "number", "minimum": 0.0 }
+      }
+    },
+    "coefficients": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": [
+        "cl",
+        "cl_kutta_joukowski",
+        "cl_pressure_integration",
+        "cd",
+        "cd_unavailable_reason",
+        "cm_quarter_chord"
+      ],
+      "properties": {
+        "cl": {
+          "type": "number",
+          "description": "主表示揚力係数（Phase 1 では Kutta-Joukowski 定理による値）"
+        },
+        "cl_kutta_joukowski": {
+          "type": "number",
+          "description": "Kutta-Joukowski 定理による揚力係数"
+        },
+        "cl_pressure_integration": {
+          "type": "number",
+          "description": "表面圧力積分による検証用揚力係数"
+        },
+        "cd": {
+          "type": ["number", "null"],
+          "description": "抗力係数。Phase 1 非粘性パネル法では常時 null（0 を返却してはならない）。"
+        },
+        "cd_unavailable_reason": {
+          "type": ["string", "null"],
+          "description": "cd が null の場合の物理的理由説明"
+        },
+        "cm_quarter_chord": {
+          "type": "number",
+          "description": "1/4弦点周りピッチングモーメント係数（頭上げ Nose-up を正）"
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "converged",
+        "condition_number",
+        "linear_residual_max",
+        "te_cp_diff",
+        "cl_discrepancy",
+        "cl_discrepancy_relative",
+        "cd_pressure_numerical_error",
+        "cp_min",
+        "cp_min_xc",
+        "max_velocity_ratio",
+        "compute_time_ms"
+      ],
+      "properties": {
+        "converged": { "type": "boolean" },
+        "condition_number": { "type": ["number", "null"] },
+        "linear_residual_max": { "type": ["number", "null"] },
+        "te_cp_diff": { "type": ["number", "null"] },
+        "cl_discrepancy": { "type": ["number", "null"] },
+        "cl_discrepancy_relative": { "type": ["number", "null"] },
+        "cd_pressure_numerical_error": {
+          "type": ["number", "null"],
+          "description": "圧力積分抗力方向の数値残差（物理抗力 CD ではないため診断専用）"
+        },
+        "cp_min": { "type": ["number", "null"] },
+        "cp_min_xc": { "type": ["number", "null"] },
+        "max_velocity_ratio": { "type": ["number", "null"] },
+        "compute_time_ms": { "type": "number", "minimum": 0.0 }
+      }
+    },
+    "surface": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["x_c", "y_c", "side", "cp", "vt_ratio"],
+      "properties": {
+        "x_c": { "type": "array", "items": { "type": "number" } },
+        "y_c": { "type": "array", "items": { "type": "number" } },
+        "side": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["upper", "lower"] }
+        },
+        "cp": { "type": "array", "items": { "type": "number" } },
+        "vt_ratio": { "type": "array", "items": { "type": "number" } }
+      }
+    },
+    "flow_field": {
+      "type": ["object", "null"],
+      "description": "2次元配列フィールド（u_ratio, v_ratio, speed_ratio, cp, is_inside_airfoil）はすべて形状 [grid_ny][grid_nx]（外側添字が y_grid 昇順、内側添字が x_grid 昇順）",
+      "additionalProperties": false,
+      "required": [
+        "x_grid",
+        "y_grid",
+        "u_ratio",
+        "v_ratio",
+        "speed_ratio",
+        "cp",
+        "is_inside_airfoil"
+      ],
+      "properties": {
+        "x_grid": { "type": "array", "items": { "type": "number" } },
+        "y_grid": { "type": "array", "items": { "type": "number" } },
+        "u_ratio": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": ["number", "null"] }
+          }
+        },
+        "v_ratio": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": ["number", "null"] }
+          }
+        },
+        "speed_ratio": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": ["number", "null"] }
+          }
+        },
+        "cp": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": ["number", "null"] }
+          }
+        },
+        "is_inside_airfoil": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "streamlines": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["x", "y"],
+        "properties": {
+          "x": { "type": "array", "items": { "type": "number" } },
+          "y": { "type": "array", "items": { "type": "number" } }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "title", "message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "HIGH_AOA_CAUTION",
+              "STALL_UNMODELED",
+              "COMPRESSIBILITY_CAUTION",
+              "TRANSONIC_OUT_OF_RANGE",
+              "LOW_RE_CAUTION",
+              "CL_CROSSCHECK_WARN",
+              "CUSTOM_AIRFOIL_NORMALIZED",
+              "OPEN_TE_CLOSED_AUTO"
+            ]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "warning", "critical"]
+          },
+          "title": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "failure": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" },
+        "details": { "type": ["object", "null"] }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "success" } } },
+      "then": {
+        "properties": {
+          "coefficients": { "type": "object" },
+          "surface": { "type": "object" },
+          "flow_field": { "type": "object" },
+          "streamlines": { "type": "array" },
+          "failure": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "failed" } } },
+      "then": {
+        "properties": {
+          "coefficients": { "type": "null" },
+          "surface": { "type": "null" },
+          "flow_field": { "type": "null" },
+          "streamlines": { "type": "null" },
+          "failure": { "type": "object" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": { "const": "success" },
+          "solver_info": {
+            "properties": { "supports_cd": { "const": false } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "coefficients": {
+            "type": "object",
+            "properties": {
+              "cd": { "type": "null" },
+              "cd_unavailable_reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

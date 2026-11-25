@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://airflowlab.local/contracts/schemas/analysis_request.schema.json",
+  "title": "AnalysisRequest",
+  "description": "AirFlow Lab POST /api/analysis/run のリクエストスキーマ（簡易モード・本格モード共通、必須7キー）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "airfoil",
+    "angle_of_attack",
+    "velocity",
+    "chord_length",
+    "fluid_properties",
+    "solver",
+    "numerical_settings"
+  ],
+  "properties": {
+    "airfoil": {
+      "type": "object",
+      "description": "解析対象の翼型指定",
+      "additionalProperties": false,
+      "required": ["source_type"],
+      "properties": {
+        "source_type": {
+          "type": "string",
+          "enum": ["naca4", "custom_dat", "custom_csv"],
+          "description": "翼型データの入力ソース種別"
+        },
+        "naca_code": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9]{4}$",
+          "default": null,
+          "description": "NACA 4桁コード（source_type='naca4' 時に必須）"
+        },
+        "name": {
+          "type": ["string", "null"],
+          "maxLength": 120,
+          "default": null,
+          "description": "翼型の表示名（任意）"
+        },
+        "raw_coordinates_text": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "カスタム翼型の生テキスト（Selig/Lednicer DAT または CSV。source_type='custom_dat' / 'custom_csv' 時に必須）"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "source_type": { "const": "naca4" } }
+          },
+          "then": {
+            "required": ["naca_code"],
+            "properties": {
+              "naca_code": { "type": "string", "pattern": "^[0-9]{4}$" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "source_type": { "enum": ["custom_dat", "custom_csv"] } }
+          },
+          "then": {
+            "required": ["raw_coordinates_text"],
+            "properties": {
+              "raw_coordinates_text": { "type": "string", "minLength": 10 }
+            }
+          }
+        }
+      ]
+    },
+    "angle_of_attack": {
+      "type": "number",
+      "minimum": -45.0,
+      "maximum": 45.0,
+      "default": 4.0,
+      "description": "迎角 alpha [deg]"
+    },
+    "velocity": {
+      "type": "number",
+      "minimum": 0.01,
+      "maximum": 1000.0,
+      "default": 15.0,
+      "description": "一様流風速 V_inf [m/s]"
+    },
+    "chord_length": {
+      "type": "number",
+      "minimum": 0.0001,
+      "maximum": 100.0,
+      "default": 0.2,
+      "description": "翼弦長 c [m]"
+    },
+    "fluid_properties": {
+      "type": "object",
+      "description": "流体物性設定（SI単位系。preset='water_20c' 時は水物性定数が mode より優先される）",
+      "additionalProperties": false,
+      "required": ["mode", "temperature_k"],
+      "properties": {
+        "preset": {
+          "type": "string",
+          "enum": ["air_std_20c", "air_0c", "water_20c", "custom"],
+          "default": "air_std_20c",
+          "description": "基本流体プリセット"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["temperature_auto", "direct_mu", "direct_nu"],
+          "default": "temperature_auto",
+          "description": "物性決定モード（temperature_auto: 温度・静圧から自動推算 / direct_mu: 密度と粘度直接入力 / direct_nu: 密度と動粘性係数直接入力）"
+        },
+        "temperature_k": {
+          "type": "number",
+          "minimum": 50.0,
+          "maximum": 2000.0,
+          "default": 293.15,
+          "description": "静温 T [K]"
+        },
+        "static_pressure_pa": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0.0,
+          "default": 101325.0,
+          "description": "静圧 p_inf [Pa]"
+        },
+        "density_kg_m3": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0.0,
+          "default": null,
+          "description": "流体密度 rho [kg/m^3]（mode='direct_mu' または 'direct_nu' 時に必須）"
+        },
+        "dynamic_viscosity_pa_s": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0.0,
+          "default": null,
+          "description": "粘性係数 mu [Pa·s]（mode='direct_mu' 時に必須）"
+        },
+        "kinematic_viscosity_m2_s": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0.0,
+          "default": null,
+          "description": "動粘性係数 nu [m^2/s]（mode='direct_nu' 時に必須）"
+        },
+        "speed_of_sound_mps": {
+          "type": ["number", "null"],
+          "exclusiveMinimum": 0.0,
+          "default": null,
+          "description": "音速 a [m/s]（null 時は温度またはプリセットから自動計算）"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "mode": { "const": "direct_mu" } }
+          },
+          "then": {
+            "required": ["density_kg_m3", "dynamic_viscosity_pa_s"],
+            "properties": {
+              "density_kg_m3": { "type": "number", "exclusiveMinimum": 0.0 },
+              "dynamic_viscosity_pa_s": { "type": "number", "exclusiveMinimum": 0.0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "mode": { "const": "direct_nu" } }
+          },
+          "then": {
+            "required": ["density_kg_m3", "kinematic_viscosity_m2_s"],
+            "properties": {
+              "density_kg_m3": { "type": "number", "exclusiveMinimum": 0.0 },
+              "kinematic_viscosity_m2_s": { "type": "number", "exclusiveMinimum": 0.0 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "preset": { "const": "custom" },
+              "mode": { "enum": ["direct_mu", "direct_nu"] },
+              "density_kg_m3": { "type": "number", "exclusiveMinimum": 10.0 }
+            },
+            "required": ["density_kg_m3"]
+          },
+          "then": {
+            "required": ["speed_of_sound_mps"],
+            "properties": {
+              "speed_of_sound_mps": { "type": "number", "exclusiveMinimum": 0.0 }
+            }
+          }
+        }
+      ]
+    },
+    "solver": {
+      "type": "object",
+      "description": "計算手法（ソルバー）指定",
+      "additionalProperties": false,
+      "required": ["method"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": ["panel_method", "xfoil", "cfd_su2"],
+          "default": "panel_method",
+          "description": "Phase 1 では panel_method のみ利用可。xfoil / cfd_su2 は 501 Not Implemented。"
+        }
+      }
+    },
+    "numerical_settings": {
+      "type": "object",
+      "description": "パネル法・流れ場格子・流線の数値計算設定",
+      "additionalProperties": false,
+      "required": [
+        "num_panels",
+        "closed_te",
+        "grid_nx",
+        "grid_ny",
+        "x_range",
+        "y_range",
+        "num_streamlines"
+      ],
+      "properties": {
+        "num_panels": {
+          "type": "integer",
+          "minimum": 40,
+          "maximum": 300,
+          "multipleOf": 2,
+          "default": 160,
+          "description": "翼型分割パネル数（40〜300 の偶数のみ）"
+        },
+        "closed_te": {
+          "type": "boolean",
+          "default": true,
+          "description": "後縁閉合オプション（true: a4=-0.1036 閉後縁 / false: a4=-0.1015 開後縁）"
+        },
+        "grid_nx": {
+          "type": "integer",
+          "minimum": 40,
+          "maximum": 240,
+          "default": 120,
+          "description": "空間流れ場 x 方向格子点数"
+        },
+        "grid_ny": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 180,
+          "default": 80,
+          "description": "空間流れ場 y 方向格子点数"
+        },
+        "x_range": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "number", "minimum": -5.0, "exclusiveMaximum": 0.0 },
+            { "type": "number", "exclusiveMinimum": 1.0, "maximum": 5.0 }
+          ],
+          "minItems": 2,
+          "maxItems": 2,
+          "items": false,
+          "default": [-0.5, 1.6],
+          "description": "空間流れ場の x/c 範囲 [x_min, x_max]（各要素 [-5.0, 5.0] 内）"
+        },
+        "y_range": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "number", "minimum": -5.0, "exclusiveMaximum": 0.0 },
+            { "type": "number", "exclusiveMinimum": 0.0, "maximum": 5.0 }
+          ],
+          "minItems": 2,
+          "maxItems": 2,
+          "items": false,
+          "default": [-0.7, 0.7],
+          "description": "空間流れ場の y/c 範囲 [y_min, y_max]（各要素 [-5.0, 5.0] 内）"
+        },
+        "num_streamlines": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 60,
+          "default": 28,
+          "description": "RK4 流線計算本数（10〜60）"
+        }
+      }
+    }
+  }
+}
